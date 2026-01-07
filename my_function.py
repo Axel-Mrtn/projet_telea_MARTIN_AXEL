@@ -1,35 +1,43 @@
 import os
 from osgeo import gdal
 
-
-def rasterization(in_vector, ref_image, out_image, field_name, dtype=None):
+def rasterisation(in_vector, ref_image, out_image, field_name, dtype="Int32", nodata=0, all_touched=True):
     """
     Rasterise un vecteur (shp) sur la grille d'un raster de référence,
     en gravant la valeur du champ field_name.
     """
-    print("in_vector:", in_vector)
-    print("ref_image:", ref_image)
-    print("out_image:", out_image)
-    print("field_name:", field_name)
+
+    ds = gdal.Open(ref_image, gdal.GA_ReadOnly)
+    if ds is None:
+        raise FileNotFoundError(f"Impossible d'ouvrir le raster de référence: {ref_image}")
+
+    gt = ds.GetGeoTransform()
+    xsize, ysize = ds.RasterXSize, ds.RasterYSize
+
+    xres = gt[1]
+    yres = abs(gt[5])
+
+    xmin = gt[0]
+    ymax = gt[3]
+    xmax = xmin + xsize * xres
+    ymin = ymax - ysize * yres
+
+    ds = None
 
 
-# for those parameters, you know how to get theses information if you had to
-sptial_resolution = 0.5
-xmin = 748231.0
-ymin = 6273800.0
-xmax = 751231.0
-ymax = 6276800.0
+    os.makedirs(os.path.dirname(out_image), exist_ok=True)
+    at_opt = "-at " if all_touched else ""
 
-# define command pattern to fill with paremeters
-cmd_pattern = ("gdal_rasterize -a {field_name} "
-               "-tr {sptial_resolution} {sptial_resolution} "
-               "-te {xmin} {ymin} {xmax} {ymax} -ot Byte -of GTiff "
-               "{in_vector} {out_image}")
+    cmd = (
+        f"gdal_rasterize {at_opt}"
+        f"-a {field_name} "
+        f"-tr {xres} {yres} "
+        f"-te {xmin} {ymin} {xmax} {ymax} "
+        f"-a_nodata {nodata} -ot {dtype} -of GTiff "
+        f"\"{in_vector}\" \"{out_image}\""
+    )
 
-# fill the string with the parameter thanks to format function
-cmd = cmd_pattern.format(in_vector=in_vector, xmin=xmin, ymin=ymin, xmax=xmax,
-                         ymax=ymax, out_image=out_image, field_name=field_name,
-                         sptial_resolution=sptial_resolution)
+    print(cmd)
 
-# execute the command in the terminal
-os.system(cmd)
+
+    return os.system(cmd)
