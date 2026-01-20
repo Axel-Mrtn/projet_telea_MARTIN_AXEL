@@ -41,3 +41,25 @@ def rasterisation(in_vector, ref_image, out_image, field_name, dtype="Int32", no
 
 
     return os.system(cmd)
+
+
+import numpy as np
+
+def compute_ari_timeseries(B3, B5, nodata=-9999):
+    B3 = B3.astype("float32")
+    B5 = B5.astype("float32")
+
+    # Masque stricte pour éviter divisions par zéro et valeurs trop petites
+    epsilon = 1e-6
+    mask = (B3 > epsilon) & (B5 > epsilon)
+
+    ari = np.full(B3.shape, nodata, dtype="float32")
+
+    ari[mask] = (
+        (1.0 / B3[mask] - 1.0 / B5[mask]) /
+        (1.0 / B3[mask] + 1.0 / B5[mask])
+    )
+
+    print("ARI stats: min =", ari[mask].min(), "max =", ari[mask].max(), "mean =", ari[mask].mean())
+
+    return ari
