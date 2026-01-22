@@ -68,38 +68,23 @@ def compute_ari_timeseries(B3, B5, nodata=-9999):
 
 
 
-def build_multiband_stack(
-    folder,
-    prefix,
-    bands,
-    dtype=np.float32
-):
-    """
-    Construit un stack multi-bandes (spectral + temporel).
+import os
+import numpy as np
+from osgeo import gdal
 
-    Parameters
-    ----------
-    folder : str
-        Dossier contenant les fichiers tif
-    prefix : str
-        Préfixe commun des fichiers (ex : 'pyrenees_23-24')
-    bands : list of str
-        Liste des bandes (ex : ['B02','B03',...])
-    dtype : numpy dtype
-        Type de sortie (par défaut float32)
+def build_multiband_stack_with_ari(folder, prefix, bands, ari_path, dtype=np.float32):
+    """
+    Construit un stack multi-bandes (Pyrénées) et le fusionne avec un raster Ari
+    en concaténant les bandes (features).
 
     Returns
     -------
-    image_stack : np.ndarray
-        Tableau (rows, cols, nb_bands_total)
-    ds_ref : GDAL Dataset
-        Dataset de référence pour la géométrie
+    image_stack_fused : np.ndarray (rows, cols, nb_bands_total)
+    ds_ref : GDAL Dataset (référence géométrie)
     """
 
-    tif_list = [
-        os.path.join(folder, f"{prefix}_{band}.tif")
-        for band in bands
-    ]
+    # --- 1) stack Pyrénées (ton code)
+    tif_list = [os.path.join(folder, f"{prefix}_{band}.tif") for band in bands]
 
     stack = []
     ds_ref = None
@@ -114,8 +99,6 @@ def build_multiband_stack(
             ds_ref = ds
 
         arr = ds.ReadAsArray()  # (times, rows, cols) ou (rows, cols)
-
-        # Cas mono-bande
         if arr.ndim == 2:
             arr = arr[np.newaxis, :, :]
 
@@ -125,13 +108,32 @@ def build_multiband_stack(
         elif n_times != n_times_ref:
             raise ValueError("Incohérence temporelle entre bandes")
 
-        # (rows, cols, times)
-        arr = np.transpose(arr, (1, 2, 0))
+        arr = np.transpose(arr, (1, 2, 0))  # (rows, cols, times)
         stack.append(arr)
 
-    # (rows, cols, times * nb_bands)
-    image_stack = np.concatenate(stack, axis=2).astype(dtype)
+    image_stack_py = np.concatenate(stack, axis=2).astype(dtype)  # (rows, cols, times*nb_bands)
 
-    return image_stack, ds_ref
+    # --- 2) lire Ari
+    ds_ari = gdal.Open(ari_path)
+    if ds_ari is None:
+        raise FileNotFoundError(f"Impossible d'ouvrir Ari : {ari_path}")
 
+    ari_arr = ds_ari.ReadAsArray()  # (bands, rows, cols) ou (rows, cols)
+    if ari_arr.ndim == 2:
+        ari_arr = ari_arr[np.newaxis, :, :]  # (1, rows, cols)
+    ari_arr = np.transpose(ari_arr, (1, 2, 0)).astype(dtype)  # (rows, cols, nb_bands_ari)
 
+    # --- 3) checks alignement
+    if (ds_ari.RasterXSize != ds_ref.RasterXSize) or (ds_ari.RasterYSize != ds_ref.RasterYSize):
+        raise ValueError("Ari n'a pas la même taille (rows/cols) que le stack Pyrénées. Il faut le reprojeter/resampler.")
+
+    if ds_ari.GetGeoTransform() != ds_ref.GetGeoTransform():
+        raise ValueError("Ari n'a pas le même GeoTransform que le stack Pyrénées. Il faut le reprojeter/resampler.")
+
+    if ds_ari.GetProjection() != ds_ref.GetProjection():
+        raise ValueError("Ari n'a pas la même projection que le stack Pyrénées. Il faut le reprojeter.")
+
+    # --- 4) fusion (concaténation des features)
+    image_stack_fused = np.concatenate([image_stack_py, ari_arr], axis=2).astype(dtype)
+
+    return image_stack_fused, ds_ref
