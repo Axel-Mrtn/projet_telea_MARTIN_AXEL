@@ -68,11 +68,7 @@ def compute_ari_timeseries(B3, B5, nodata=-9999):
 
 
 
-import os
-import numpy as np
-from osgeo import gdal
-
-def build_multiband_stack_with_ari(folder, prefix, bands, ari_path, dtype=np.float32):
+def create_feature_stack(folder, prefix, bands, ari_path, dtype=np.float32):
     """
     Construit un stack multi-bandes (Pyrénées) et le fusionne avec un raster Ari
     en concaténant les bandes (features).
