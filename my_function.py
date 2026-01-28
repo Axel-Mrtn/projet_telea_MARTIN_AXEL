@@ -79,53 +79,58 @@ all_touched : bool, optional
 
 def compute_ari_timeseries(B3, B5, nodata=-9999):
     """
-Calcule l’indice de réflectance des anthocyanes (ARI) pour un jeu de données
-multi-temporel à partir des bandes spectrales Sentinel-2.
+    Calcule l’indice de réflectance des anthocyanes (ARI) pour un jeu de données
+    multi-temporel à partir des bandes spectrales Sentinel-2.
 
-Parameters
-----------
-B3 : ndarray
-    Tableau contenant les valeurs de la bande verte (B03). Le tableau peut
-    être multidimensionnel afin de représenter une série temporelle.
-B5 : ndarray
-    Tableau contenant les valeurs de la bande red-edge (B05). Doit avoir
-    la même forme que B3.
-nodata : int or float, optional
-    Valeur utilisée pour remplir les pixels pour lesquels l’ARI ne peut
-    pas être calculé (par défaut -9999).
+    Parameters
+    ----------
+    B3 : ndarray
+        Tableau contenant les valeurs de la bande verte (B03). Le tableau peut
+        être multidimensionnel afin de représenter une série temporelle.
+    B5 : ndarray
+        Tableau contenant les valeurs de la bande red-edge (B05). Doit avoir
+        la même forme que B3.
+    nodata : int or float, optional
+        Valeur utilisée pour remplir les pixels pour lesquels l’ARI ne peut
+        pas être calculé (par défaut -9999).
 
-Returns
--------
-ari : ndarray
-    Tableau contenant les valeurs de l’ARI calculées pixel par pixel pour
-    l’ensemble de la série temporelle. Les pixels pour lesquels l’indice
-    ne peut pas être calculé sont affectés à la valeur nodata.
-"""
-# Conversion des bandes B03 et B05 en type float pour garantir la précision
-# des calculs et éviter les erreurs liées aux divisions
-B3 = B3.astype("float32")
-B5 = B5.astype("float32")
+    Returns
+    -------
+    ari : ndarray
+        Tableau contenant les valeurs de l’ARI calculées pixel par pixel pour
+        l’ensemble de la série temporelle. Les pixels pour lesquels l’indice
+        ne peut pas être calculé sont affectés à la valeur nodata.
+    """
 
-# Définition d’un seuil minimal pour éviter les divisions par zéro
-# et les valeurs numériques trop faibles
-epsilon = 1e-6
-mask = (B3 > epsilon) & (B5 > epsilon)
+    # Conversion des bandes B03 et B05 en type float pour garantir la précision
+    # des calculs et éviter les erreurs liées aux divisions
+    B3 = B3.astype("float32")
+    B5 = B5.astype("float32")
 
-# Initialisation du tableau ARI avec la valeur NoData
-ari = np.full(B3.shape, nodata, dtype="float32")
+    # Définition d’un seuil minimal pour éviter les divisions par zéro
+    # et les valeurs numériques trop faibles
+    epsilon = 1e-6
+    mask = (B3 > epsilon) & (B5 > epsilon)
 
-# Calcul de l’indice ARI uniquement sur les pixels valides
-ari[mask] = (
-    (1.0 / B3[mask] - 1.0 / B5[mask]) /
-    (1.0 / B3[mask] + 1.0 / B5[mask])
-)
+    # Initialisation du tableau ARI avec la valeur NoData
+    ari = np.full(B3.shape, nodata, dtype="float32")
 
-# Affichage de statistiques descriptives sur les valeurs ARI calculées
-# (minimum, maximum et moyenne) pour contrôle et diagnostic
-print("ARI stats: min =", ari[mask].min(), "max =", ari[mask].max(), "mean =", ari[mask].mean())
+    # Calcul de l’indice ARI uniquement sur les pixels valides
+    ari[mask] = (
+        (1.0 / B3[mask] - 1.0 / B5[mask]) /
+        (1.0 / B3[mask] + 1.0 / B5[mask])
+    )
 
-# Retour du raster ARI (série temporelle)
-return ari
+    # Affichage de statistiques descriptives sur les valeurs ARI calculées
+    # (minimum, maximum et moyenne) pour contrôle et diagnostic
+    print(
+        "ARI stats: min =", ari[mask].min(),
+        "max =", ari[mask].max(),
+        "mean =", ari[mask].mean()
+    )
+
+    # Retour du raster ARI (série temporelle)
+    return ari
 
 
 
